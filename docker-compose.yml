@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: design-agent-postgres
+    environment:
+      POSTGRES_USER: design_agent
+      POSTGRES_PASSWORD: design_agent_pwd
+      POSTGRES_DB: design_agent_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U design_agent -d design_agent_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 缓存/队列/LangGraph Checkpointer
+  redis:
+    image: redis:7-alpine
+    container_name: design-agent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO 对象存储 (S3 兼容)
+  minio:
+    image: minio/minio:latest
+    container_name: design-agent-minio
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_password
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ChromaDB 向量数据库
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: design-agent-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+
+  # FastAPI 后端
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: design-agent-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://design_agent:design_agent_pwd@postgres:5432/design_agent_db
+      - REDIS_URL=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minio_admin
+      - MINIO_SECRET_KEY=minio_password
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - QWEN_API_KEY=${QWEN_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+
+  # Celery Worker 异步任务
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: design-agent-celery
+    environment:
+      - DATABASE_URL=postgresql://design_agent:design_agent_pwd@postgres:5432/design_agent_db
+      - REDIS_URL=redis://redis:6379/0
+      - QWEN_API_KEY=${QWEN_API_KEY}
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./backend:/app
+    command: celery -A app.celery_app worker --loglevel=info
+
+  # React 前端 (开发模式)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: design-agent-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  chroma_data:

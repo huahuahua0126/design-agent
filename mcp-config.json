@@ -1,0 +1,42 @@
+{
+    "mcpServers": {
+        "requirement-mcp": {
+            "command": "python",
+            "args": [
+                "mcp-servers/requirement-server/server.py"
+            ],
+            "env": {
+                "DATABASE_URL": "postgresql://design_agent:design_agent_pwd@localhost:5432/design_agent_db"
+            }
+        },
+        "dispatcher-mcp": {
+            "command": "python",
+            "args": [
+                "mcp-servers/dispatcher-server/server.py"
+            ],
+            "env": {
+                "DATABASE_URL": "postgresql://design_agent:design_agent_pwd@localhost:5432/design_agent_db"
+            }
+        },
+        "rag-mcp": {
+            "command": "python",
+            "args": [
+                "mcp-servers/rag-server/server.py"
+            ],
+            "env": {
+                "CHROMA_HOST": "localhost",
+                "CHROMA_PORT": "8000",
+                "QWEN_API_KEY": "${QWEN_API_KEY}"
+            }
+        },
+        "analytics-mcp": {
+            "command": "python",
+            "args": [
+                "mcp-servers/analytics-server/server.py"
+            ],
+            "env": {
+                "DATABASE_URL": "postgresql://design_agent:design_agent_pwd@localhost:5432/design_agent_db"
+            }
+        }
+    }
+}

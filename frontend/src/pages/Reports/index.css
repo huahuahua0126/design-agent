@@ -1,0 +1,19 @@
+.reports-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.filter-card .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.stats-row {
+    margin-bottom: 16px;
+}
+
+.table-card {
+    margin-top: 16px;
+}
