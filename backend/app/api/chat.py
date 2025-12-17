@@ -10,7 +10,7 @@ import uuid
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.agent.requirement_agent import get_requirement_agent
+from app.agent.multi_agent_workflow import get_multi_agent_orchestrator
 
 router = APIRouter()
 
@@ -41,9 +41,11 @@ async def websocket_chat(websocket: WebSocket, token: str):
     
     await websocket.accept()
     
-    agent = get_requirement_agent()
+    orchestrator = get_multi_agent_orchestrator()
     conversation_id = str(uuid.uuid4())
     is_new_session = True
+    conversation_history = []  # Store conversation for context
+    user_id = payload.get("user_id", 1)  # Get user_id from token
     
     try:
         # 等待第一条消息，判断是否需要发送欢迎消息
@@ -85,11 +87,14 @@ async def websocket_chat(websocket: WebSocket, token: str):
             if conv_id and conv_id != conversation_id:
                 conversation_id = conv_id
             
-            result = await agent.chat(
+            result = await orchestrator.process(
                 user_message=user_message,
-                conversation_id=conversation_id,
-                current_form=current_form
+                user_id=user_id,
+                current_form=current_form,
+                conversation_history="\n".join(conversation_history[-5:])  # Last 5 messages
             )
+            conversation_history.append(f"User: {user_message}")
+            conversation_history.append(f"Assistant: {result['response']}")
             
             response = {
                 "type": "message",
@@ -111,12 +116,15 @@ async def websocket_chat(websocket: WebSocket, token: str):
             current_form = message_data.get("current_form", {})
             conv_id = message_data.get("conversation_id", conversation_id)
             
-            # 调用 Agent
-            result = await agent.chat(
+            # 调用 Multi-Agent Orchestrator
+            result = await orchestrator.process(
                 user_message=user_message,
-                conversation_id=conv_id,
-                current_form=current_form
+                user_id=user_id,
+                current_form=current_form,
+                conversation_history="\n".join(conversation_history[-5:])
             )
+            conversation_history.append(f"User: {user_message}")
+            conversation_history.append(f"Assistant: {result['response']}")
             
             # 发送响应
             response = {
@@ -143,14 +151,16 @@ async def http_chat(
     db: AsyncSession = Depends(get_db)
 ):
     """HTTP 对话接口 (备用)"""
-    agent = get_requirement_agent()
+    orchestrator = get_multi_agent_orchestrator()
     
     conversation_id = chat_data.conversation_id or str(uuid.uuid4())
     
-    result = await agent.chat(
+    # TODO: Get user_id from auth
+    result = await orchestrator.process(
         user_message=chat_data.message,
-        conversation_id=conversation_id,
-        current_form=chat_data.current_form
+        user_id=1,
+        current_form=chat_data.current_form,
+        conversation_history=""
     )
     
     return ChatResponse(

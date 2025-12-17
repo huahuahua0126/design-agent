@@ -77,7 +77,10 @@ Thumbs.db
 # ===================
 # Data & Logs
 # ===================
-backend/data/
+backend/data/*
+!backend/data/design_specs/
+backend/data/design_specs/*
+!backend/data/design_specs/*.md
 *.db
 *.sqlite
 *.sqlite3

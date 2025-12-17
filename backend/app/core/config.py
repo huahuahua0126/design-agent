@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     QWEN_MODEL: str = "qwen-max"
     QWEN_VL_MODEL: str = "qwen-vl-max"
     
+    # PostgreSQL + pgvector 配置
+    PGVECTOR_CONNECTION_STRING: str = "postgresql://postgres:postgres@localhost:5432/design_agent"
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

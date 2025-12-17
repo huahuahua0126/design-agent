@@ -51,3 +51,21 @@ async def get_db() -> AsyncSession:
             raise
         finally:
             await session.close()
+
+
+# 为 tools 提供的会话上下文管理器
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def get_db_session():
+    """获取数据库会话上下文管理器（用于 tools）"""
+    async with async_session_maker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
